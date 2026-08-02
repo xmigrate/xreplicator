@@ -1,10 +1,11 @@
 # XReplicator Frontend Container
 
-Build from the frontend source directory:
+Build from the packaged standalone web directory:
 
 ```bash
-docker build --platform linux/amd64 -t ghcr.io/xmigrate/xreplicator-frontend:dev -f container/frontend/Dockerfile /path/to/replicator/web/frontend
+tar xzf xreplicator-web-1.4.3.tar.gz
+docker build --platform linux/amd64 -t ghcr.io/xmigrate/xreplicator-frontend:dev -f container/frontend/Dockerfile web
 ```
 
 The GitHub Actions workflow expects a release asset or manual `source_url`
-containing the contents of `replicator/web/frontend`.
+containing the standalone `web` package from the Replicator release pipeline.

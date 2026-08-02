@@ -1,29 +1,22 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS deps
 
 RUN apk add --no-cache libc6-compat python3 make g++
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --omit=dev && npm cache clean --force
 
-COPY . .
-RUN npm run build
-RUN npm prune --omit=dev && npm cache clean --force
-
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 
 RUN apk add --no-cache curl dumb-init
 
 WORKDIR /app
 
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/src/proto ./src/proto
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-RUN mkdir -p /app/.next/cache && chown -R node:node /app/.next /app/node_modules
+RUN mkdir -p /app/.next/cache && chown -R node:node /app
 
 USER node
 
