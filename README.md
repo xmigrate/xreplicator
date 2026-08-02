@@ -26,3 +26,44 @@ xreplicator is a production-grade block-level incremental backup system with **e
 
 - Website: xmigrate.cloud
 - Docs: xmigrate.cloud/docs
+
+## Kubernetes Distribution
+
+The backup server can run in Kubernetes. The Helm chart defaults to bundled
+PostgreSQL and MinIO for a self-contained install. Customers can disable those
+components and point the chart at external PostgreSQL and S3-compatible object
+storage.
+
+Distribution artifacts:
+
+- Runtime image packaging: `container/backup-server`, `container/frontend`
+- Raw Kubernetes manifests: `deploy/kubernetes`
+- Helm chart: `charts/xreplicator-backup-server`
+- GitHub Actions workflows:
+  - Backup server image: `.github/workflows/backup-server-image.yaml`
+  - Frontend image: `.github/workflows/frontend-image.yaml`
+  - Helm chart package: `.github/workflows/helm-chart.yaml`
+
+Image:
+
+```text
+ghcr.io/xmigrate/xreplicator-backup-server:<version>
+ghcr.io/xmigrate/xreplicator-frontend:<version>
+```
+
+Helm chart:
+
+```text
+ghcr.io/xmigrate/charts/xreplicator-backup-server:<version>
+```
+
+Published releases also include the packaged chart:
+
+```text
+xreplicator-backup-server-<version>.tgz
+```
+
+Active-active Kubernetes deployments use a StatefulSet so each replica has a
+stable identity and peer-reachable DNS name. Single-replica Kubernetes
+deployments are supported by setting `replicaCount: 1` and
+`server.activeActive: false` in the Helm values.

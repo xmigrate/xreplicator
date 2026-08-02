@@ -1,0 +1,136 @@
+name: Frontend Container Image
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 1.5.0
+        required: false
+      source_url:
+        description: HTTPS URL for a frontend source tarball. Optional for release-triggered runs.
+        required: false
+      push_latest:
+        description: Also push the latest tag
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/xmigrate/xreplicator-frontend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout packaging
+        uses: actions/checkout@v4
+
+      - name: Resolve release input
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_SOURCE_URL: ${{ inputs.source_url }}
+          INPUT_PUSH_LATEST: ${{ inputs.push_latest }}
+        run: |
+          set -eu
+
+          version="${INPUT_VERSION}"
+          source_url="${INPUT_SOURCE_URL}"
+          push_latest="${INPUT_PUSH_LATEST:-true}"
+          release_tag="${INPUT_VERSION:+v${INPUT_VERSION}}"
+          asset_name=""
+
+          if [ "${EVENT_NAME}" = "release" ]; then
+            version="${RELEASE_TAG#v}"
+            release_tag="${RELEASE_TAG}"
+            push_latest="true"
+            asset_name="$(
+              gh release view "${RELEASE_TAG}" --json assets \
+                --jq '.assets[]
+                  | select(.name | test("frontend.*\\.tar\\.gz|web.*frontend.*\\.tar\\.gz|web-ui.*\\.tar\\.gz"))
+                  | .name' \
+                | head -n 1
+            )"
+            if [ -n "${asset_name}" ]; then
+              source_url="$(
+                gh release view "${RELEASE_TAG}" --json assets \
+                  --jq ".assets[] | select(.name == \"${asset_name}\") | .url" \
+                  | head -n 1
+              )"
+            fi
+          fi
+
+          if [ -z "${version}" ]; then
+            echo "version is required for manual runs" >&2
+            exit 1
+          fi
+          if [ -z "${source_url}" ]; then
+            echo "frontend source tarball asset was not found" >&2
+            exit 1
+          fi
+
+          {
+            echo "version=${version}"
+            echo "source_url=${source_url}"
+            echo "push_latest=${push_latest}"
+            echo "release_tag=${release_tag}"
+            echo "asset_name=${asset_name}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download frontend source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/xreplicator-frontend
+          if [ -n "${{ steps.release.outputs.asset_name }}" ]; then
+            gh release download "${{ steps.release.outputs.release_tag }}" \
+              --pattern "${{ steps.release.outputs.asset_name }}" \
+              --output /tmp/xreplicator-frontend/source.tar.gz
+          else
+            curl -fsSL "${{ steps.release.outputs.source_url }}" -o /tmp/xreplicator-frontend/source.tar.gz
+          fi
+          tar -xzf /tmp/xreplicator-frontend/source.tar.gz -C /tmp/xreplicator-frontend --strip-components=1
+          cp container/frontend/Dockerfile /tmp/xreplicator-frontend/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: image-tags
+        run: |
+          {
+            echo 'tags<<EOF'
+            echo "${IMAGE_NAME}:${{ steps.release.outputs.version }}"
+            if [ "${{ steps.release.outputs.push_latest }}" = "true" ]; then
+              echo "${IMAGE_NAME}:latest"
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/xreplicator-frontend
+          file: /tmp/xreplicator-frontend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image-tags.outputs.tags }}

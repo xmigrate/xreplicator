@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "xreplicator-backup-server.fullname" . }}
+  labels:
+    {{- include "xreplicator-backup-server.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "xreplicator-backup-server.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "xreplicator-backup-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "xreplicator-backup-server.selectorLabels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: backup-server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
+            - name: metrics
+              containerPort: {{ .Values.service.metricsPort }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: XREPLICATOR_HEADLESS_SERVICE
+              value: {{ include "xreplicator-backup-server.fullname" . }}-headless
+            - name: XREPLICATOR_REPOSITORY_PATH
+              value: {{ .Values.server.repositoryPath | quote }}
+            - name: XREPLICATOR_FIXED_BLOCK_SIZE_MB
+              value: {{ .Values.server.fixedBlockSizeMB | quote }}
+            - name: XREPLICATOR_LOG_LEVEL
+              value: {{ .Values.server.logLevel | quote }}
+            - name: XREPLICATOR_ACTIVE_ACTIVE
+              value: {{ .Values.server.activeActive | quote }}
+            - name: XREPLICATOR_STORAGE_BACKEND
+              value: {{ .Values.server.storageBackend | quote }}
+            - name: XREPLICATOR_TLS_SERVER_NAME
+              value: {{ .Values.server.tlsServerName | quote }}
+            - name: XREPLICATOR_DR_WORKERS
+              value: {{ .Values.server.drWorkers | quote }}
+            - name: XREPLICATOR_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.postgresSecretName" . }}
+                  key: {{ .Values.postgres.dsnSecretKey }}
+            - name: XREPLICATOR_OBJECT_PROVIDER
+              value: {{ .Values.objectStorage.provider | quote }}
+            - name: XREPLICATOR_OBJECT_ENDPOINT
+              value: {{ include "xreplicator-backup-server.objectEndpoint" . | quote }}
+            - name: XREPLICATOR_OBJECT_BUCKET
+              value: {{ .Values.objectStorage.bucket | quote }}
+            - name: XREPLICATOR_OBJECT_PREFIX
+              value: {{ .Values.objectStorage.prefix | quote }}
+            - name: XREPLICATOR_OBJECT_USE_SSL
+              value: {{ .Values.objectStorage.useSSL | quote }}
+            - name: XREPLICATOR_OBJECT_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.objectAccessSecretName" . }}
+                  key: {{ .Values.objectStorage.accessKeySecretKey }}
+            - name: XREPLICATOR_OBJECT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.objectSecretSecretName" . }}
+                  key: {{ .Values.objectStorage.secretKeySecretKey }}
+            {{- if .Values.objectStorage.sessionTokenSecretName }}
+            - name: XREPLICATOR_OBJECT_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.objectStorage.sessionTokenSecretName }}
+                  key: {{ .Values.objectStorage.sessionTokenSecretKey }}
+            {{- end }}
+            - name: XREPLICATOR_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.internalSecretName" . }}
+                  key: {{ .Values.internalAuth.secretKey }}
+          volumeMounts:
+            - name: repository
+              mountPath: /var/lib/xreplicator
+            - name: tls
+              mountPath: /etc/xreplicator/tls
+              readOnly: true
+            - name: license
+              mountPath: /etc/xreplicator/license
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+        - name: license
+          secret:
+            secretName: {{ .Values.license.secretName }}
+  volumeClaimTemplates:
+    - metadata:
+        name: repository
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.persistence.storageClassName }}
+        storageClassName: {{ .Values.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}

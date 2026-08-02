@@ -1,0 +1,164 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: xreplicator-backup-server-headless
+  namespace: xreplicator
+  labels:
+    app.kubernetes.io/name: xreplicator-backup-server
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/name: xreplicator-backup-server
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xreplicator-backup-server
+  namespace: xreplicator
+  labels:
+    app.kubernetes.io/name: xreplicator-backup-server
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: xreplicator-backup-server
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: xreplicator-backup-server
+  namespace: xreplicator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xreplicator-backup-server
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xreplicator-backup-server
+  namespace: xreplicator
+  labels:
+    app.kubernetes.io/name: xreplicator-backup-server
+spec:
+  serviceName: xreplicator-backup-server-headless
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: xreplicator-backup-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: xreplicator-backup-server
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: backup-server
+          image: ghcr.io/xmigrate/xreplicator-backup-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 50051
+            - name: metrics
+              containerPort: 9090
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: XREPLICATOR_HEADLESS_SERVICE
+              value: xreplicator-backup-server-headless
+            - name: XREPLICATOR_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: xreplicator-backup-server
+                  key: postgres-dsn
+            - name: XREPLICATOR_STORAGE_BACKEND
+              value: object
+            - name: XREPLICATOR_OBJECT_PROVIDER
+              value: s3
+            - name: XREPLICATOR_OBJECT_ENDPOINT
+              value: xreplicator-minio:9000
+            - name: XREPLICATOR_OBJECT_BUCKET
+              value: xreplicator-backups
+            - name: XREPLICATOR_OBJECT_PREFIX
+              value: repo
+            - name: XREPLICATOR_OBJECT_USE_SSL
+              value: "false"
+            - name: XREPLICATOR_OBJECT_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xreplicator-backup-server
+                  key: object-access-key
+            - name: XREPLICATOR_OBJECT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xreplicator-backup-server
+                  key: object-secret-key
+            - name: XREPLICATOR_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: xreplicator-backup-server
+                  key: internal-secret
+          volumeMounts:
+            - name: repository
+              mountPath: /var/lib/xreplicator
+            - name: tls
+              mountPath: /etc/xreplicator/tls
+              readOnly: true
+            - name: license
+              mountPath: /etc/xreplicator/license
+              readOnly: true
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: tls
+          secret:
+            secretName: xreplicator-tls
+        - name: license
+          secret:
+            secretName: xreplicator-license
+  volumeClaimTemplates:
+    - metadata:
+        name: repository
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi

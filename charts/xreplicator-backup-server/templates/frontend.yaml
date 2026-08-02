@@ -1,0 +1,90 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "xreplicator-backup-server.frontendName" . }}
+  labels:
+    {{- include "xreplicator-backup-server.frontendLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "xreplicator-backup-server.frontendSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "xreplicator-backup-server.frontendSelectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.targetPort }}
+          env:
+            - name: BACKUP_GRPC_ADDRESS
+              value: {{ printf "%s:%v" (include "xreplicator-backup-server.fullname" .) .Values.service.grpcPort | quote }}
+            - name: BACKUP_GRPC_CA_FILE
+              value: /etc/xreplicator/tls/ca.crt
+            - name: BACKUP_GRPC_CERT_FILE
+              value: /etc/xreplicator/tls/tls.crt
+            - name: BACKUP_GRPC_KEY_FILE
+              value: /etc/xreplicator/tls/tls.key
+            - name: BACKUP_GRPC_SERVER_NAME
+              value: {{ .Values.server.tlsServerName | quote }}
+            - name: XREPLICATOR_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.internalSecretName" . }}
+                  key: {{ .Values.internalAuth.secretKey }}
+            - name: XREPLICATOR_WEB_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.webSecretName" . }}
+                  key: {{ .Values.frontend.webSessionSecretKey }}
+            - name: MCP_ENABLED
+              value: {{ .Values.frontend.mcpEnabled | quote }}
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/xreplicator/tls
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "xreplicator-backup-server.frontendName" . }}
+  labels:
+    {{- include "xreplicator-backup-server.frontendLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.frontend.service.type }}
+  selector:
+    {{- include "xreplicator-backup-server.frontendSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: http
+{{- end }}

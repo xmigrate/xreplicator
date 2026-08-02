@@ -1,0 +1,120 @@
+{{- if .Values.minio.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "xreplicator-backup-server.minioName" . }}
+  labels:
+    {{- include "xreplicator-backup-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  selector:
+    {{- include "xreplicator-backup-server.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "xreplicator-backup-server.minioName" . }}
+  labels:
+    {{- include "xreplicator-backup-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: {{ include "xreplicator-backup-server.minioName" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "xreplicator-backup-server.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "xreplicator-backup-server.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      containers:
+        - name: minio
+          image: "{{ .Values.minio.image.repository }}:{{ .Values.minio.image.tag }}"
+          imagePullPolicy: {{ .Values.minio.image.pullPolicy }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.secretName" . }}
+                  key: object-access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.secretName" . }}
+                  key: object-secret-key
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.minio.persistence.storageClassName }}
+        storageClassName: {{ .Values.minio.persistence.storageClassName | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.minio.persistence.size }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "xreplicator-backup-server.minioName" . }}-bucket
+  labels:
+    {{- include "xreplicator-backup-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio-bucket
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "xreplicator-backup-server.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: minio-bucket
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: "{{ .Values.minio.mcImage.repository }}:{{ .Values.minio.mcImage.tag }}"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.secretName" . }}
+                  key: object-access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "xreplicator-backup-server.secretName" . }}
+                  key: object-secret-key
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until mc alias set local http://{{ include "xreplicator-backup-server.minioName" . }}:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do sleep 2; done
+              mc mb --ignore-existing local/{{ .Values.objectStorage.bucket }}
+{{- end }}

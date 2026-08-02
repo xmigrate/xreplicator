@@ -1,0 +1,137 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/xmigrate/xreplicator-backup-server
+  tag: latest
+  pullPolicy: IfNotPresent
+
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/xmigrate/xreplicator-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: LoadBalancer
+    port: 80
+    targetPort: 3000
+  webSessionSecretName: ""
+  webSessionSecretKey: web-session-secret
+  webSessionSecretValue: xreplicator-web-change-me
+  mcpEnabled: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+service:
+  type: LoadBalancer
+  grpcPort: 50051
+  metricsPort: 9090
+
+server:
+  fixedBlockSizeMB: 16
+  logLevel: info
+  tlsServerName: backup-server.xmigrate.com
+  repositoryPath: /var/lib/xreplicator/repository
+  storageBackend: object
+  activeActive: true
+  drWorkers: 1
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 16-alpine
+    pullPolicy: IfNotPresent
+  database: xreplicator
+  username: xreplicator
+  password: xreplicator-change-me
+  dsnSecretName: ""
+  dsnSecretKey: postgres-dsn
+  persistence:
+    size: 20Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+minio:
+  enabled: true
+  image:
+    repository: minio/minio
+    tag: latest
+    pullPolicy: IfNotPresent
+  mcImage:
+    repository: minio/mc
+    tag: latest
+  rootUser: minioadmin
+  rootPassword: minioadmin-change-me
+  persistence:
+    size: 100Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+objectStorage:
+  provider: s3
+  endpoint: ""
+  bucket: xreplicator-backups
+  prefix: repo
+  useSSL: false
+  accessKeySecretName: ""
+  accessKeySecretKey: object-access-key
+  secretKeySecretName: ""
+  secretKeySecretKey: object-secret-key
+  sessionTokenSecretName: ""
+  sessionTokenSecretKey: ""
+
+internalAuth:
+  secretName: ""
+  secretKey: internal-secret
+  value: xreplicator-internal-change-me
+
+tls:
+  secretName: xreplicator-tls
+
+license:
+  secretName: xreplicator-license
+
+persistence:
+  size: 50Gi
+  storageClassName: ""
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
