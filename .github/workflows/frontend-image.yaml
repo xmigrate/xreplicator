@@ -9,7 +9,7 @@ on:
         description: Release version, for example 1.5.0
         required: false
       source_url:
-        description: HTTPS URL for a frontend source tarball. Optional for release-triggered runs.
+        description: HTTPS URL for a frontend/web source tarball. Optional for release-triggered runs.
         required: false
       push_latest:
         description: Also push the latest tag
@@ -56,16 +56,19 @@ jobs:
             version="${RELEASE_TAG#v}"
             release_tag="${RELEASE_TAG}"
             push_latest="true"
+          fi
+
+          if [ -z "${source_url}" ] && [ -n "${release_tag}" ]; then
             asset_name="$(
-              gh release view "${RELEASE_TAG}" --json assets \
+              gh release view "${release_tag}" --json assets \
                 --jq '.assets[]
-                  | select(.name | test("frontend.*\\.tar\\.gz|web.*frontend.*\\.tar\\.gz|web-ui.*\\.tar\\.gz"))
+                  | select(.name | test("frontend.*\\.tar\\.gz|xreplicator-web.*\\.tar\\.gz|web.*frontend.*\\.tar\\.gz|web-ui.*\\.tar\\.gz"))
                   | .name' \
                 | head -n 1
             )"
             if [ -n "${asset_name}" ]; then
               source_url="$(
-                gh release view "${RELEASE_TAG}" --json assets \
+                gh release view "${release_tag}" --json assets \
                   --jq ".assets[] | select(.name == \"${asset_name}\") | .url" \
                   | head -n 1
               )"
