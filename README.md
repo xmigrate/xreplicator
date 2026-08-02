@@ -38,6 +38,7 @@ Distribution artifacts:
 
 - Runtime image packaging: `container/backup-server`, `container/frontend`
 - Raw Kubernetes manifests: `deploy/kubernetes`
+- Docker Compose quickstart: `deploy/docker-compose`
 - Helm chart: `charts/xreplicator-backup-server`
 - GitHub Actions workflows:
   - Backup server image: `.github/workflows/backup-server-image.yaml`

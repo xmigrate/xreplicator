@@ -134,6 +134,6 @@ jobs:
         with:
           context: /tmp/xreplicator-frontend
           file: /tmp/xreplicator-frontend/Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.image-tags.outputs.tags }}

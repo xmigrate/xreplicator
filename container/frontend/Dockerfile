@@ -9,6 +9,7 @@ RUN npm ci
 
 COPY . .
 RUN npm run build
+RUN npm prune --omit=dev && npm cache clean --force
 
 FROM node:18-alpine AS runner
 
@@ -16,14 +17,13 @@ RUN apk add --no-cache curl dumb-init
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/src/proto ./src/proto
 
-RUN mkdir -p /app/.next/cache && chown -R node:node /app/.next
+RUN mkdir -p /app/.next/cache && chown -R node:node /app/.next /app/node_modules
 
 USER node
 
