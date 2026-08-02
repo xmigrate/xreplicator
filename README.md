@@ -64,6 +64,29 @@ Published releases also include the packaged chart:
 xreplicator-backup-server-<version>.tgz
 ```
 
+Install the published Helm chart:
+
+```bash
+export VERSION=1.4.3
+
+helm upgrade --install xreplicator \
+  oci://ghcr.io/xmigrate/charts/xreplicator-backup-server \
+  --version "$VERSION" \
+  --namespace xreplicator \
+  --create-namespace \
+  --set fullnameOverride=xreplicator \
+  --set image.tag="$VERSION" \
+  --set frontend.image.tag="$VERSION"
+```
+
+For a single-host trial, use Docker Compose:
+
+```bash
+cd deploy/docker-compose
+cp .env.example .env
+docker compose up -d
+```
+
 Active-active Kubernetes deployments use a StatefulSet so each replica has a
 stable identity and peer-reachable DNS name. Single-replica Kubernetes
 deployments are supported by setting `replicaCount: 1` and

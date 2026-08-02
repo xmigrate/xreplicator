@@ -1,41 +1,70 @@
 # xreplicator-backup-server Helm Chart
 
-Install:
-
-```bash
-helm upgrade --install xreplicator-backup-server ./charts/xreplicator-backup-server \
-  --namespace xreplicator --create-namespace
-```
-
-By default, the chart installs PostgreSQL and MinIO inside the cluster. Create
-only the TLS and license secrets before installing. The chart also deploys the
-web UI as a separate frontend service.
-
-Default images:
+Published chart:
 
 ```text
-ghcr.io/xmigrate/xreplicator-backup-server:latest
-ghcr.io/xmigrate/xreplicator-frontend:latest
+oci://ghcr.io/xmigrate/charts/xreplicator-backup-server
 ```
 
+Install the published release:
+
 ```bash
-kubectl -n xreplicator create secret generic xreplicator-license \
+export VERSION=1.4.3
+export NAMESPACE=xreplicator
+export RELEASE=xreplicator
+export CHART=oci://ghcr.io/xmigrate/charts/xreplicator-backup-server
+
+kubectl create namespace "$NAMESPACE"
+
+kubectl -n "$NAMESPACE" create secret generic xreplicator-license \
   --from-file=license.json=./license.json
 
-kubectl -n xreplicator create secret generic xreplicator-tls \
+kubectl -n "$NAMESPACE" create secret generic xreplicator-tls \
   --from-file=tls.crt=./server.crt \
   --from-file=tls.key=./server.key \
   --from-file=ca.crt=./ca.crt
+
+helm upgrade --install "$RELEASE" "$CHART" \
+  --version "$VERSION" \
+  --namespace "$NAMESPACE" \
+  --create-namespace \
+  --set fullnameOverride=xreplicator \
+  --set image.tag="$VERSION" \
+  --set frontend.image.tag="$VERSION"
+```
+
+The chart deploys the backup server, web UI, and optional PostgreSQL and MinIO
+services. Default runtime images:
+
+```text
+ghcr.io/xmigrate/xreplicator-backup-server:<version>
+ghcr.io/xmigrate/xreplicator-frontend:<version>
 ```
 
 For active-active, keep `replicaCount >= 2`, PostgreSQL metadata, and object
-storage enabled. For a single-replica Kubernetes deployment, set:
+storage enabled. For a single-replica deployment:
 
 ```yaml
 replicaCount: 1
 server:
+  metadataBackend: postgres
+  storageBackend: object
   activeActive: false
-  storageBackend: local
+```
+
+Supported model switches:
+
+```yaml
+server:
+  metadataBackend: sqlite   # sqlite or postgres
+  storageBackend: local     # local or object
+  activeActive: false
+
+postgres:
+  enabled: false
+
+minio:
+  enabled: false
 ```
 
 To use external PostgreSQL and object storage:

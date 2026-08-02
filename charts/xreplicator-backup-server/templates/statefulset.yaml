@@ -58,17 +58,22 @@ spec:
               value: {{ .Values.server.logLevel | quote }}
             - name: XREPLICATOR_ACTIVE_ACTIVE
               value: {{ .Values.server.activeActive | quote }}
+            - name: XREPLICATOR_METADATA_BACKEND
+              value: {{ .Values.server.metadataBackend | quote }}
             - name: XREPLICATOR_STORAGE_BACKEND
               value: {{ .Values.server.storageBackend | quote }}
             - name: XREPLICATOR_TLS_SERVER_NAME
               value: {{ .Values.server.tlsServerName | quote }}
             - name: XREPLICATOR_DR_WORKERS
               value: {{ .Values.server.drWorkers | quote }}
+            {{- if eq .Values.server.metadataBackend "postgres" }}
             - name: XREPLICATOR_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
                   name: {{ include "xreplicator-backup-server.postgresSecretName" . }}
                   key: {{ .Values.postgres.dsnSecretKey }}
+            {{- end }}
+            {{- if eq .Values.server.storageBackend "object" }}
             - name: XREPLICATOR_OBJECT_PROVIDER
               value: {{ .Values.objectStorage.provider | quote }}
             - name: XREPLICATOR_OBJECT_ENDPOINT
@@ -95,6 +100,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.objectStorage.sessionTokenSecretName }}
                   key: {{ .Values.objectStorage.sessionTokenSecretKey }}
+            {{- end }}
             {{- end }}
             - name: XREPLICATOR_INTERNAL_SECRET
               valueFrom:

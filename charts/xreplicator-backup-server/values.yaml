@@ -1,5 +1,8 @@
 replicaCount: 2
 
+nameOverride: ""
+fullnameOverride: ""
+
 image:
   repository: ghcr.io/xmigrate/xreplicator-backup-server
   tag: latest
@@ -34,6 +37,7 @@ service:
   metricsPort: 9090
 
 server:
+  metadataBackend: postgres
   fixedBlockSizeMB: 16
   logLevel: info
   tlsServerName: backup-server.xmigrate.com
