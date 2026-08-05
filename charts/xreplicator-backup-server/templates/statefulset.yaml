@@ -17,7 +17,14 @@ spec:
     spec:
       terminationGracePeriodSeconds: 60
       securityContext:
+        {{- if .Values.restoreHostAccess.enabled }}
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+        {{- else }}
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -34,6 +41,10 @@ spec:
         - name: backup-server
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.restoreHostAccess.enabled }}
+          securityContext:
+            privileged: true
+          {{- end }}
           ports:
             - name: grpc
               containerPort: {{ .Values.service.grpcPort }}
@@ -116,6 +127,10 @@ spec:
             - name: license
               mountPath: /etc/xreplicator/license
               readOnly: true
+            {{- if .Values.restoreHostAccess.enabled }}
+            - name: host-dev
+              mountPath: /dev
+            {{- end }}
           readinessProbe:
             tcpSocket:
               port: grpc
@@ -135,6 +150,12 @@ spec:
         - name: license
           secret:
             secretName: {{ .Values.license.secretName }}
+        {{- if .Values.restoreHostAccess.enabled }}
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
+        {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: repository

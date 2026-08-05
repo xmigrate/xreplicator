@@ -8,6 +8,10 @@ environments that already have managed PostgreSQL or object storage, edit
 `secrets.example.yaml` and `backup-server.yaml` to point at the external
 services instead, and skip `postgres-minio.yaml`.
 
+Prepare/mount restore requires the backup-server pod to run privileged as root
+with host `/dev` mounted. The raw manifests enable this by default so
+dynamically-created loop devices are visible inside the container.
+
 Apply:
 
 ```bash

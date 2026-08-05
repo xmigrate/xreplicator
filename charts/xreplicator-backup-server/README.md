@@ -41,6 +41,10 @@ ghcr.io/xmigrate/xreplicator-backup-server:<version>
 ghcr.io/xmigrate/xreplicator-frontend:<version>
 ```
 
+Prepare/mount restore requires the backup-server pod to run privileged as root
+with host `/dev` mounted. The chart enables this by default so `losetup` can
+create and expose dynamic `/dev/loopN` devices inside the container.
+
 For active-active, keep `replicaCount >= 2`, PostgreSQL metadata, and object
 storage enabled. For a single-replica deployment:
 
@@ -92,4 +96,11 @@ internalAuth:
 
 frontend:
   webSessionSecretName: xreplicator-external
+```
+
+To run backup ingestion without prepare/mount restore:
+
+```yaml
+restoreHostAccess:
+  enabled: false
 ```

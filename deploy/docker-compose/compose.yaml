@@ -43,6 +43,8 @@ services:
 
   backup-server:
     image: ghcr.io/xmigrate/xreplicator-backup-server:${XREPLICATOR_VERSION:-1.4.3}
+    user: "0:0"
+    privileged: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,6 +71,7 @@ services:
       - backup-server-data:/var/lib/xreplicator
       - ./tls:/etc/xreplicator/tls:ro
       - ./license:/etc/xreplicator/license:ro
+      - /dev:/dev
 
   frontend:
     image: ghcr.io/xmigrate/xreplicator-frontend:${XREPLICATOR_VERSION:-1.4.3}

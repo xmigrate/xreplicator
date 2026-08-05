@@ -132,6 +132,9 @@ podSecurityContext:
   runAsGroup: 10001
   fsGroup: 10001
 
+restoreHostAccess:
+  enabled: true
+
 podDisruptionBudget:
   enabled: true
   minAvailable: 1

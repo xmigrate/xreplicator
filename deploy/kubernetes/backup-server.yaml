@@ -65,14 +65,16 @@ spec:
     spec:
       terminationGracePeriodSeconds: 60
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 10001
+        runAsNonRoot: false
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
       containers:
         - name: backup-server
           image: ghcr.io/xmigrate/xreplicator-backup-server:latest
           imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
           ports:
             - name: grpc
               containerPort: 50051
@@ -130,6 +132,8 @@ spec:
             - name: license
               mountPath: /etc/xreplicator/license
               readOnly: true
+            - name: host-dev
+              mountPath: /dev
           readinessProbe:
             tcpSocket:
               port: grpc
@@ -154,6 +158,10 @@ spec:
         - name: license
           secret:
             secretName: xreplicator-license
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
   volumeClaimTemplates:
     - metadata:
         name: repository

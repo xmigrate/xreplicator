@@ -11,6 +11,8 @@ for production Kubernetes deployments.
 - Docker with Docker Compose
 - An XReplicator license at `license/license.json`
 - TLS files at `tls/ca.crt`, `tls/tls.crt`, and `tls/tls.key`
+- A trusted Docker host that allows privileged containers and host `/dev`
+  access. Prepare/mount restore uses dynamically-created loop devices.
 
 For a local test certificate:
 
