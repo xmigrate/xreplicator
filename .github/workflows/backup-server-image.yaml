@@ -60,7 +60,7 @@ jobs:
             package_name="$(
               gh release view "${RELEASE_TAG}" --json assets \
                 --jq '.assets[]
-                  | select(.name | test("(backup|backup-server|xreplicator).*(linux.*amd64|amd64).*\\.deb"))
+                  | select(.name | test("(backup-server|xreplicator-backup-server).*(linux.*amd64|amd64).*\\.deb"))
                   | .name' \
                 | head -n 1
             )"

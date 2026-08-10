@@ -9,12 +9,16 @@ COPY ${PACKAGE} /tmp/backup.deb
 COPY entrypoint.sh /entrypoint.sh
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates tzdata netcat-openbsd && \
-    (dpkg -i /tmp/backup.deb || apt-get -f install -y --no-install-recommends) && \
+    apt-get install -y --no-install-recommends ca-certificates tzdata netcat-openbsd systemd && \
+    mv /usr/bin/systemctl /usr/bin/systemctl.real && \
+    printf '#!/bin/sh\nexit 0\n' > /usr/bin/systemctl && \
+    chmod +x /usr/bin/systemctl && \
+    dpkg -i /tmp/backup.deb && \
+    mv /usr/bin/systemctl.real /usr/bin/systemctl && \
     rm -rf /var/lib/apt/lists/* /tmp/backup.deb && \
     groupadd --system --gid 10001 xreplicator && \
     useradd --system --uid 10001 --gid xreplicator --home-dir /nonexistent --shell /usr/sbin/nologin xreplicator && \
-    ln -sf "$(command -v backup)" /app/backup && \
+    ln -sf "$(command -v xreplicator)" /app/backup && \
     chmod +x /entrypoint.sh && \
     mkdir -p /var/lib/xreplicator /etc/xreplicator && \
     chown -R xreplicator:xreplicator /var/lib/xreplicator /etc/xreplicator /app
