@@ -42,7 +42,7 @@ services:
         mc mb --ignore-existing local/xreplicator-backups
 
   backup-server:
-    image: ghcr.io/xmigrate/xreplicator-backup-server:${XREPLICATOR_VERSION:-1.4.3}
+    image: ghcr.io/xmigrate/xreplicator-backup-server:${XREPLICATOR_VERSION:-latest}
     user: "0:0"
     privileged: true
     depends_on:
@@ -74,7 +74,7 @@ services:
       - /dev:/dev
 
   frontend:
-    image: ghcr.io/xmigrate/xreplicator-frontend:${XREPLICATOR_VERSION:-1.4.3}
+    image: ghcr.io/xmigrate/xreplicator-frontend:${XREPLICATOR_VERSION:-latest}
     depends_on:
       backup-server:
         condition: service_healthy

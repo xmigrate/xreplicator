@@ -50,6 +50,8 @@ Image:
 ```text
 ghcr.io/xmigrate/xreplicator-backup-server:<version>
 ghcr.io/xmigrate/xreplicator-frontend:<version>
+ghcr.io/xmigrate/xreplicator-backup-server:latest
+ghcr.io/xmigrate/xreplicator-frontend:latest
 ```
 
 Helm chart:

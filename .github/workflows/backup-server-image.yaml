@@ -8,8 +8,8 @@ on:
       version:
         description: Release version, for example 1.5.0
         required: false
-      binary_url:
-        description: HTTPS URL for the linux amd64 backup binary. Optional for release-triggered runs.
+      package_url:
+        description: HTTPS URL for the linux amd64 backup server deb package. Optional for release-triggered runs.
         required: false
       push_latest:
         description: Also push the latest tag
@@ -42,32 +42,32 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_ID: ${{ github.event.release.id }}
           INPUT_VERSION: ${{ inputs.version }}
-          INPUT_BINARY_URL: ${{ inputs.binary_url }}
+          INPUT_PACKAGE_URL: ${{ inputs.package_url }}
           INPUT_PUSH_LATEST: ${{ inputs.push_latest }}
         run: |
           set -eu
 
           version="${INPUT_VERSION}"
-          binary_url="${INPUT_BINARY_URL}"
+          package_url="${INPUT_PACKAGE_URL}"
           push_latest="${INPUT_PUSH_LATEST:-true}"
           release_tag="${INPUT_VERSION:+v${INPUT_VERSION}}"
-          asset_name=""
+          package_name=""
 
           if [ "${EVENT_NAME}" = "release" ]; then
             version="${RELEASE_TAG#v}"
             release_tag="${RELEASE_TAG}"
             push_latest="true"
-            asset_name="$(
+            package_name="$(
               gh release view "${RELEASE_TAG}" --json assets \
                 --jq '.assets[]
-                  | select(.name | test("backup.*linux.*amd64|backup-server.*linux.*amd64|backup.*amd64|backup-server.*amd64"))
+                  | select(.name | test("(backup|backup-server|xreplicator).*(linux.*amd64|amd64).*\\.deb"))
                   | .name' \
                 | head -n 1
             )"
-            if [ -n "${asset_name}" ]; then
-              binary_url="$(
+            if [ -n "${package_name}" ]; then
+              package_url="$(
                 gh release view "${RELEASE_TAG}" --json assets \
-                  --jq ".assets[] | select(.name == \"${asset_name}\") | .url" \
+                  --jq ".assets[] | select(.name == \"${package_name}\") | .url" \
                   | head -n 1
               )"
             fi
@@ -77,31 +77,30 @@ jobs:
             echo "version is required for manual runs" >&2
             exit 1
           fi
-          if [ -z "${binary_url}" ]; then
-            echo "linux amd64 backup binary asset was not found" >&2
+          if [ -z "${package_url}" ]; then
+            echo "linux amd64 backup server deb asset was not found" >&2
             exit 1
           fi
 
           {
             echo "version=${version}"
-            echo "binary_url=${binary_url}"
+            echo "package_url=${package_url}"
             echo "push_latest=${push_latest}"
             echo "release_tag=${release_tag}"
-            echo "asset_name=${asset_name}"
+            echo "package_name=${package_name}"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Download backup binary
+      - name: Download backup server package
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -n "${{ steps.release.outputs.asset_name }}" ]; then
+          if [ -n "${{ steps.release.outputs.package_name }}" ]; then
             gh release download "${{ steps.release.outputs.release_tag }}" \
-              --pattern "${{ steps.release.outputs.asset_name }}" \
-              --output container/backup-server/backup
+              --pattern "${{ steps.release.outputs.package_name }}" \
+              --output container/backup-server/backup.deb
           else
-            curl -fsSL "${{ steps.release.outputs.binary_url }}" -o container/backup-server/backup
+            curl -fsSL "${{ steps.release.outputs.package_url }}" -o container/backup-server/backup.deb
           fi
-          chmod +x container/backup-server/backup
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

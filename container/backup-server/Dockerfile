@@ -1,16 +1,18 @@
-FROM alpine:3.20
-
-RUN apk add --no-cache ca-certificates tzdata netcat-openbsd
-
-RUN addgroup -g 10001 -S xreplicator && adduser -u 10001 -S -G xreplicator xreplicator
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-ARG BINARY=backup
-COPY ${BINARY} /app/backup
+ARG PACKAGE=backup.deb
+COPY ${PACKAGE} /tmp/backup.deb
 COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /app/backup /entrypoint.sh && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates tzdata netcat-openbsd /tmp/backup.deb && \
+    rm -rf /var/lib/apt/lists/* /tmp/backup.deb && \
+    groupadd --system --gid 10001 xreplicator && \
+    useradd --system --uid 10001 --gid xreplicator --home-dir /nonexistent --shell /usr/sbin/nologin xreplicator && \
+    ln -sf "$(command -v backup)" /app/backup && \
+    chmod +x /entrypoint.sh && \
     mkdir -p /var/lib/xreplicator /etc/xreplicator && \
     chown -R xreplicator:xreplicator /var/lib/xreplicator /etc/xreplicator /app
 

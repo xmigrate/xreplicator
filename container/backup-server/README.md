@@ -1,11 +1,11 @@
 # Backup Server Container
 
-This image packages the released `backup` binary and runs `backup server`.
+This image installs the released backup server `.deb` package and runs `backup server`.
 
 Build locally:
 
 ```bash
-cp /path/to/backup ./container/backup-server/backup
+cp /path/to/backup-server.deb ./container/backup-server/backup.deb
 docker build --platform linux/amd64 -t ghcr.io/xmigrate/xreplicator-backup-server:dev ./container/backup-server
 ```
 
