@@ -1,5 +1,7 @@
 FROM debian:bookworm-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
 ARG PACKAGE=backup.deb
@@ -7,7 +9,8 @@ COPY ${PACKAGE} /tmp/backup.deb
 COPY entrypoint.sh /entrypoint.sh
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates tzdata netcat-openbsd /tmp/backup.deb && \
+    apt-get install -y --no-install-recommends ca-certificates tzdata netcat-openbsd && \
+    (dpkg -i /tmp/backup.deb || apt-get -f install -y --no-install-recommends) && \
     rm -rf /var/lib/apt/lists/* /tmp/backup.deb && \
     groupadd --system --gid 10001 xreplicator && \
     useradd --system --uid 10001 --gid xreplicator --home-dir /nonexistent --shell /usr/sbin/nologin xreplicator && \
