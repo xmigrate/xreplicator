@@ -13,6 +13,7 @@ RUN apt-get update && \
     mv /usr/bin/systemctl /usr/bin/systemctl.real && \
     printf '#!/bin/sh\nexit 0\n' > /usr/bin/systemctl && \
     chmod +x /usr/bin/systemctl && \
+    apt-get install -y --no-install-recommends lvm2 && \
     dpkg -i /tmp/backup.deb && \
     mv /usr/bin/systemctl.real /usr/bin/systemctl && \
     rm -rf /var/lib/apt/lists/* /tmp/backup.deb && \
