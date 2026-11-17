@@ -69,6 +69,7 @@ services:
       - "9090:9090"
     volumes:
       - backup-server-data:/var/lib/xreplicator
+      - ${XREPLICATOR_MOUNT_TMP_DIR:-./mounts}:/var/lib/xreplicator/repository/mounts
       - ./tls:/etc/xreplicator/tls:ro
       - ./license:/etc/xreplicator/license:ro
       - /dev:/dev
