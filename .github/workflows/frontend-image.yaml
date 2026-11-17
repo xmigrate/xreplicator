@@ -58,7 +58,7 @@ jobs:
             push_latest="true"
           fi
 
-          if [ -z "${source_url}" ] && [ -n "${release_tag}" ]; then
+          if [ -n "${release_tag}" ]; then
             asset_name="$(
               gh release view "${release_tag}" --json assets \
                 --jq '.assets[]
@@ -66,12 +66,9 @@ jobs:
                   | .name' \
                 | head -n 1
             )"
-            if [ -n "${asset_name}" ]; then
-              source_url="$(
-                gh release view "${release_tag}" --json assets \
-                  --jq ".assets[] | select(.name == \"${asset_name}\") | .url" \
-                  | head -n 1
-              )"
+            if [ -z "${asset_name}" ]; then
+              echo "frontend source tarball asset was not found in release ${release_tag}" >&2
+              exit 1
             fi
           fi
 
