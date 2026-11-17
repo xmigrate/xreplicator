@@ -2,6 +2,12 @@
 
 This image installs the released backup server `.deb` package and runs `backup server`.
 
+For a manual run of **Backup Server Container Image**, enter the release version
+(for example, `1.5.0` or `v1.5.0`) and leave `package_url` empty. The workflow
+discovers the amd64 backup server `.deb` in this repository's release and
+downloads it using the GitHub token. Set `package_url` only to override release
+discovery with an explicit HTTPS download URL.
+
 Build locally:
 
 ```bash

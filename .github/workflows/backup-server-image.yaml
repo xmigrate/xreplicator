@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example 1.5.0
+        description: Release version, for example 1.5.0 or v1.5.0
         required: false
       package_url:
-        description: HTTPS URL for the linux amd64 backup server deb package. Optional for release-triggered runs.
+        description: Optional HTTPS package URL override. Otherwise discover the linux amd64 deb from the release.
         required: false
       push_latest:
         description: Also push the latest tag
@@ -40,45 +40,46 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          RELEASE_ID: ${{ github.event.release.id }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_PACKAGE_URL: ${{ inputs.package_url }}
           INPUT_PUSH_LATEST: ${{ inputs.push_latest }}
         run: |
-          set -eu
+          set -euo pipefail
 
-          version="${INPUT_VERSION}"
+          version="${INPUT_VERSION#v}"
           package_url="${INPUT_PACKAGE_URL}"
           push_latest="${INPUT_PUSH_LATEST:-true}"
-          release_tag="${INPUT_VERSION:+v${INPUT_VERSION}}"
+          release_tag=""
           package_name=""
 
           if [ "${EVENT_NAME}" = "release" ]; then
             version="${RELEASE_TAG#v}"
             release_tag="${RELEASE_TAG}"
             push_latest="true"
-            package_name="$(
-              gh release view "${RELEASE_TAG}" --json assets \
-                --jq '.assets[]
-                  | select(.name | test("(backup-server|xreplicator-backup-server).*(linux.*amd64|amd64).*\\.deb"))
-                  | .name' \
-                | head -n 1
-            )"
-            if [ -n "${package_name}" ]; then
-              package_url="$(
-                gh release view "${RELEASE_TAG}" --json assets \
-                  --jq ".assets[] | select(.name == \"${package_name}\") | .url" \
-                  | head -n 1
-              )"
-            fi
+          elif [ -n "${version}" ]; then
+            release_tag="v${version}"
           fi
 
           if [ -z "${version}" ]; then
             echo "version is required for manual runs" >&2
             exit 1
           fi
+
           if [ -z "${package_url}" ]; then
-            echo "linux amd64 backup server deb asset was not found" >&2
+            package_name="$(
+              gh release view "${release_tag}" --repo "${GITHUB_REPOSITORY}" --json assets \
+                --jq '[.assets[]
+                  | select(.name | test("^(backup-server|xreplicator-backup-server).*amd64.*\\.deb$"))
+                  | .name] | sort | .[0] // empty'
+            )"
+            if [ -z "${package_name}" ]; then
+              echo "linux amd64 backup server deb asset was not found in ${GITHUB_REPOSITORY} release ${release_tag}" >&2
+              exit 1
+            fi
+          fi
+
+          if [ -n "${package_url}" ] && [[ "${package_url}" != https://* ]]; then
+            echo "package_url must use HTTPS" >&2
             exit 1
           fi
 
@@ -93,13 +94,17 @@ jobs:
       - name: Download backup server package
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          PACKAGE_NAME: ${{ steps.release.outputs.package_name }}
+          PACKAGE_URL: ${{ steps.release.outputs.package_url }}
         run: |
-          if [ -n "${{ steps.release.outputs.package_name }}" ]; then
-            gh release download "${{ steps.release.outputs.release_tag }}" \
-              --pattern "${{ steps.release.outputs.package_name }}" \
+          set -euo pipefail
+          if [ -n "${PACKAGE_NAME}" ]; then
+            gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+              --pattern "${PACKAGE_NAME}" \
               --output container/backup-server/backup.deb
           else
-            curl -fsSL "${{ steps.release.outputs.package_url }}" -o container/backup-server/backup.deb
+            curl -fsSL "${PACKAGE_URL}" -o container/backup-server/backup.deb
           fi
           dpkg-deb --field container/backup-server/backup.deb Package Version Architecture
           test "$(dpkg-deb --field container/backup-server/backup.deb Architecture)" = "amd64"
